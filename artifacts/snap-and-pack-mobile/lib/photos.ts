@@ -53,15 +53,15 @@ async function captureResized(
   return { uri: out.uri, base64: out.base64 };
 }
 
-/** カバンの中身の写真(検問用)。1024px/0.5 はアップロード時間との
- * バランス(実測で判定精度は 1280px と差が出ない)。 */
+/** カバンの中身の写真(検問用)。800px/0.45 はアップロード時間との
+ * バランス(物体の有無判定は 800px で精度が落ちない)。 */
 export function captureBagPhoto(): Promise<CapturedPhoto | null> {
-  return captureResized(1024, 0.5);
+  return captureResized(800, 0.45);
 }
 
 /** マイアイテムの実物参照写真 → data URI で永続化する */
 export async function captureRefPhoto(): Promise<string | null> {
-  const shot = await captureResized(900, 0.55);
+  const shot = await captureResized(640, 0.5);
   if (!shot) return null;
   return `data:image/jpeg;base64,${shot.base64}`;
 }
