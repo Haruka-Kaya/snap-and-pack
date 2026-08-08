@@ -68,6 +68,18 @@ The `ios/` directory contains the full Flutter iOS project:
 | `NSCalendarsWriteOnlyAccessUsageDescription` | iOS 17+ write-only access (`device_calendar`) |
 | `NSMicrophoneUsageDescription` | TTS engine (`flutter_tts`) |
 
+### iOS 17+ calendar permissions
+
+iOS 17 split calendar access into **full access** (`NSCalendarsFullAccessUsageDescription`) and **write-only** (`NSCalendarsWriteOnlyAccessUsageDescription`). All three keys (including the legacy `NSCalendarsUsageDescription` for iOS 16 and earlier) are declared in `ios/Runner/Info.plist`.
+
+**Version pinning:** `device_calendar` must be **>= 4.3.3** — this is the release that added iOS 17+ support (calls `requestFullAccessToEvents` when built with the iOS 17 SDK; see builttoroam/device_calendar issue #490 / PR #497). Earlier versions (<= 4.3.2) request the legacy permission and users get a blank events list on iOS 17+ even after granting access. `pubspec.yaml` pins `device_calendar: ^4.3.3`; do not downgrade.
+
+**On-device verification checklist (requires a real iOS 17+ device):**
+1. Fresh install (or Settings → Privacy → Calendars → remove the app), launch, tap a calendar area on the home screen → the iOS 17 **Full Access** dialog should appear with the Japanese/English string from Info.plist.
+2. Grant Full Access → today's events appear on the home screen (`CalendarService.todayEvents()` reads all calendars, deduped, sorted).
+3. Deny access → app shows only fixed presets (no crash; `todayEvents()` returns an empty list).
+4. Start a photo check → camera dialog shows the `NSCameraUsageDescription` string; pick from gallery → photo-library dialog shows the `NSPhotoLibraryUsageDescription` string.
+
 ## Bundle identifier
 
 Default: `com.example.wasuremonoZero` — change `PRODUCT_BUNDLE_IDENTIFIER` in `ios/Runner.xcodeproj/project.pbxproj` (3 occurrences) and in Xcode Signing & Capabilities before App Store submission.
