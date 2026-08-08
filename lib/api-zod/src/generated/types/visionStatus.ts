@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface HealthStatus {
-  status: string;
+export interface VisionStatus {
+  /** True when at least one provider API key is configured */
+  hasKeys: boolean;
 }

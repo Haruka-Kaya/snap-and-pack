@@ -6,6 +6,9 @@ import { logger } from "./lib/logger";
 
 const app: Express = express();
 
+// Behind the Replit proxy — needed for real client IPs (vision rate limiting).
+app.set("trust proxy", true);
+
 app.use(
   pinoHttp({
     logger,
@@ -26,7 +29,8 @@ app.use(
   }),
 );
 app.use(cors());
-app.use(express.json());
+// Base64 photo payloads (≤3 belongings shots @~4MB b64 + bounded refs)
+app.use(express.json({ limit: "20mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);

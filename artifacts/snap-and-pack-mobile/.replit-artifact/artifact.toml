@@ -1,0 +1,24 @@
+kind = "mobile"
+previewPath = "/"
+title = "Snap & Pack"
+description = "AI が写真からカバンの中身をチェックして忘れ物を防ぐモバイルアプリ。カレンダー連携で予定に合わせた持ち物リストも提案する。"
+version = "1.0.0"
+id = "artifacts/snap-and-pack-mobile"
+router = "expo-domain"
+
+[[services]]
+name = "expo"
+ensurePreviewReachable = "/status"
+paths = [ "/" ]
+localPort = 24937
+
+[services.development]
+run = "pnpm --filter @workspace/snap-and-pack-mobile run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/snap-and-pack-mobile", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/snap-and-pack-mobile", "run", "serve" ]
+
+[services.env]
+PORT = "24937"
+BASE_PATH = "/"

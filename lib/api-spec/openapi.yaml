@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: vision
+    description: AI vision inspection and packing suggestions (Snap & Pack)
 paths:
   /healthz:
     get:
@@ -24,6 +26,86 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /vision/status:
+    get:
+      operationId: visionStatus
+      tags: [vision]
+      summary: AI provider key status
+      description: Reports whether any AI vision provider API key is configured on the server.
+      responses:
+        "200":
+          description: Status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VisionStatus"
+  /vision/inspect:
+    post:
+      operationId: visionInspect
+      tags: [vision]
+      summary: Find missing checklist items in belongings photos
+      description: >
+        Checks 1..n belongings photos against a packing checklist using Gemini
+        (primary) with Claude fallback, and returns the ids of items not visible
+        in any photo.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VisionInspectRequest"
+      responses:
+        "200":
+          description: Inspection result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VisionInspectResult"
+        "502":
+          description: All AI providers failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VisionError"
+        "503":
+          description: No AI provider API keys configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VisionError"
+  /vision/suggest:
+    post:
+      operationId: visionSuggest
+      tags: [vision]
+      summary: Suggest packing items for a calendar event
+      description: >
+        Asks the AI to pick needed item ids from the user's candidates for a
+        calendar event, plus up to 3 new item suggestions.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VisionSuggestRequest"
+      responses:
+        "200":
+          description: Suggestion result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VisionSuggestResult"
+        "502":
+          description: All AI providers failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VisionError"
+        "503":
+          description: No AI provider API keys configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VisionError"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +115,117 @@ components:
           type: string
       required:
         - status
-
+    VisionStatus:
+      type: object
+      properties:
+        hasKeys:
+          type: boolean
+          description: True when at least one provider API key is configured
+      required:
+        - hasKeys
+    ChecklistItem:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+      required:
+        - id
+        - name
+    ReferencePhoto:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Item id this reference photo belongs to
+        data:
+          type: string
+          description: Base64-encoded JPEG (no data URI prefix)
+      required:
+        - id
+        - data
+    VisionInspectRequest:
+      type: object
+      properties:
+        photos:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          description: Base64-encoded JPEG belongings photos (no data URI prefix)
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChecklistItem"
+          minItems: 1
+        refs:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReferencePhoto"
+        lenient:
+          type: array
+          items:
+            type: string
+          description: Item ids previously confirmed as false-missing (judge leniently)
+      required:
+        - photos
+        - items
+    VisionInspectResult:
+      type: object
+      properties:
+        missing:
+          type: array
+          items:
+            type: string
+          description: Ids of checklist items not visible in any photo
+      required:
+        - missing
+    SuggestExtra:
+      type: object
+      properties:
+        name:
+          type: string
+        emoji:
+          type: string
+      required:
+        - name
+        - emoji
+    VisionSuggestRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        time:
+          type: string
+        location:
+          type: string
+        candidates:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChecklistItem"
+          minItems: 1
+      required:
+        - title
+        - candidates
+    VisionSuggestResult:
+      type: object
+      properties:
+        ids:
+          type: array
+          items:
+            type: string
+        extra:
+          type: array
+          items:
+            $ref: "#/components/schemas/SuggestExtra"
+      required:
+        - ids
+        - extra
+    VisionError:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
