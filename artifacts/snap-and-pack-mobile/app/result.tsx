@@ -16,6 +16,7 @@ import { useApp } from '@/context/AppContext';
 import { t } from '@/lib/i18n';
 import { itemName, type Item } from '@/lib/items';
 import { Store } from '@/lib/store';
+import { ensureAudibleTts } from '@/lib/tts';
 import { Btn, ToastView, useToast } from '@/components/ui';
 
 export default function ResultScreen() {
@@ -36,6 +37,8 @@ export default function ResultScreen() {
   );
   const ok = missingItems.length === 0;
 
+  const [announcedLine, setAnnouncedLine] = useState<string | null>(null);
+
   const announce = (currentMissing: Item[]) => {
     Speech.stop();
     if (currentMissing.length === 0) {
@@ -43,10 +46,14 @@ export default function ResultScreen() {
         lang === 'ja'
           ? '出発ヨシ! いってらっしゃい!'
           : 'Good to go! Have a great day!';
-      Speech.speak(line, {
-        language: lang === 'ja' ? 'ja-JP' : 'en-US',
-        pitch: 1.0,
-        rate: 1.0,
+      setAnnouncedLine(line);
+      // iOS: 消音スイッチON でも鳴るように .playback カテゴリへ切替えてから話す
+      ensureAudibleTts().finally(() => {
+        Speech.speak(line, {
+          language: lang === 'ja' ? 'ja-JP' : 'en-US',
+          pitch: 1.0,
+          rate: 1.0,
+        });
       });
     } else {
       const names = currentMissing.map((e) => itemName(e, lang));
@@ -54,10 +61,13 @@ export default function ResultScreen() {
         lang === 'ja'
           ? `${names.join('と、')}が!! ありません!! 忘れています!!`
           : `Your ${names.join(' and ')} ${names.length > 1 ? 'are' : 'is'} MISSING!!`;
-      Speech.speak(line, {
-        language: lang === 'ja' ? 'ja-JP' : 'en-US',
-        pitch: 1.2,
-        rate: 1.05,
+      setAnnouncedLine(line);
+      ensureAudibleTts().finally(() => {
+        Speech.speak(line, {
+          language: lang === 'ja' ? 'ja-JP' : 'en-US',
+          pitch: 1.2,
+          rate: 1.05,
+        });
       });
       // 怒りの振動(Vibration pattern の近似)
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
@@ -123,6 +133,11 @@ export default function ResultScreen() {
         ) : (
           <View style={[styles.center, { width: '100%' }]} testID="result-missing">
             <Text style={styles.missingTitle}>{t(lang, 'missingTitle')}</Text>
+            {announcedLine != null && (
+              <View style={styles.announceBanner} testID="announce-banner">
+                <Text style={styles.announceBannerText}>📢 {announcedLine}</Text>
+              </View>
+            )}
             <View style={{ height: 18 }} />
             {missingItems.map((item) => (
               <View key={item.id} style={[styles.center, { marginBottom: 26 }]}>
@@ -206,6 +221,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     marginTop: 12,
+  },
+  announceBanner: {
+    backgroundColor: 'rgba(0,0,0,0.25)',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    marginTop: 12,
+    maxWidth: '100%',
+  },
+  announceBannerText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   offlinePill: {
     position: 'absolute',
