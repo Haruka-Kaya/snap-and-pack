@@ -19,7 +19,16 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AppProvider, useApp } from '@/context/AppContext';
 
 // API server base URL (shared proxy routes /api to the api-server artifact).
-setBaseUrl(`https://${process.env.EXPO_PUBLIC_DOMAIN}`);
+// EXPO_PUBLIC_DOMAIN は Replit の dev スクリプト経由でのみ入る。それ以外
+// (ローカル起動・スタンドアロンビルド・Expo Go 直起動)では未定義になり
+// "https://undefined" へ投げて全滅 → 常時ローカル簡易判定に落ちるため、
+// 公開デプロイのドメインへフォールバックする。
+const PUBLISHED_API_DOMAIN = 'snap-and-pack.replit.app';
+const apiDomain =
+  process.env.EXPO_PUBLIC_API_DOMAIN ||
+  process.env.EXPO_PUBLIC_DOMAIN ||
+  PUBLISHED_API_DOMAIN;
+setBaseUrl(`https://${apiDomain}`);
 
 SplashScreen.preventAutoHideAsync();
 

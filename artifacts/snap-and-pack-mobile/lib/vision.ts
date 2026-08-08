@@ -36,10 +36,16 @@ export async function findMissing(
   items: Item[],
   lenient: string[],
 ): Promise<string[] | null> {
+  const t0 = Date.now();
   try {
     const refs = items
       .filter((e): e is Item & { photo: string } => !!e.photo)
       .map((e) => ({ id: e.id, data: dataUriToBase64(e.photo) }));
+    const payloadKb = Math.round(
+      (photosB64.reduce((n, p) => n + p.length, 0) +
+        refs.reduce((n, r) => n + r.data.length, 0)) /
+        1024,
+    );
     const res = await visionInspect({
       photos: photosB64,
       items: items.map((e) => ({ id: e.id, name: e.en })),
@@ -47,8 +53,12 @@ export async function findMissing(
       lenient,
       ...ownKeys(),
     });
+    console.log(
+      `[vision] inspect ok in ${Date.now() - t0}ms (payload ~${payloadKb}KB, photos=${photosB64.length}, refs=${refs.length})`,
+    );
     return res.missing;
-  } catch {
+  } catch (err) {
+    console.log(`[vision] inspect FAILED in ${Date.now() - t0}ms:`, err);
     return null;
   }
 }

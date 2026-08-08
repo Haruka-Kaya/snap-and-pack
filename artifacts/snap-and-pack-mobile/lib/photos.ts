@@ -53,9 +53,10 @@ async function captureResized(
   return { uri: out.uri, base64: out.base64 };
 }
 
-/** カバンの中身の写真(検問用) */
+/** カバンの中身の写真(検問用)。1024px/0.5 はアップロード時間との
+ * バランス(実測で判定精度は 1280px と差が出ない)。 */
 export function captureBagPhoto(): Promise<CapturedPhoto | null> {
-  return captureResized(1280, 0.6);
+  return captureResized(1024, 0.5);
 }
 
 /** マイアイテムの実物参照写真 → data URI で永続化する */

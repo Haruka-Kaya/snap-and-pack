@@ -6,6 +6,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Platform,
   Pressable,
   ScrollView,
@@ -42,6 +43,16 @@ export default function HomeScreen() {
 
   const [events, setEvents] = useState<CalEvent[]>([]);
   const [suggesting, setSuggesting] = useState<boolean>(false);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+
+  const reloadEvents = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      setEvents(await todayEvents());
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -182,11 +193,33 @@ export default function HomeScreen() {
         </Text>
 
         {/* 今日の予定(カレンダー連携、native のみ) */}
-        {events.length > 0 && (
+        {(events.length > 0 || Platform.OS !== 'web') && (
           <>
-            <Text style={[styles.sectionLabel, { color: colors.foreground }]}>
-              {t(lang, 'todayPlans')}
-            </Text>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <Text style={[styles.sectionLabel, { color: colors.foreground }]}>
+                {t(lang, 'todayPlans')}
+              </Text>
+              <Pressable
+                testID="refresh-events"
+                onPress={() => {
+                  if (!refreshing) reloadEvents();
+                }}
+                hitSlop={10}
+                style={{ paddingTop: 18, paddingHorizontal: 4 }}
+              >
+                {refreshing ? (
+                  <ActivityIndicator size="small" color={colors.mutedForeground} />
+                ) : (
+                  <Feather name="refresh-cw" size={17} color={colors.mutedForeground} />
+                )}
+              </Pressable>
+            </View>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
