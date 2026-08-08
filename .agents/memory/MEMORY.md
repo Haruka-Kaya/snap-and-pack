@@ -1,0 +1,1 @@
+- [Flutter tooling unavailable](flutter-env.md) — no Flutter/Dart matching pubspec's sdk ^3.12.2 runs in this Replit env; generate platform assets with ImageMagick mimicking flutter_launcher_icons output.
