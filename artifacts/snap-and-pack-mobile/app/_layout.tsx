@@ -34,6 +34,7 @@ function RootLayoutNav() {
       <Stack.Screen name="check" />
       <Stack.Screen name="result" />
       <Stack.Screen name="my-items" />
+      <Stack.Screen name="settings" />
     </Stack>
   );
 }

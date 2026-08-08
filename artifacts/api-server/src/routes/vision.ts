@@ -43,9 +43,36 @@ function isValidB64(s: string, maxChars: number): boolean {
   return s.length > 0 && s.length <= maxChars && BASE64_RE.test(s);
 }
 
+// Two layers of rate limiting:
+//  1. Per-client (req.ip) — fairness. Best-effort: client identity behind
+//     proxies is inherently spoofable, so this is NOT the security boundary.
+//  2. Global minute + daily budget for requests that spend the SERVER keys —
+//     the hard ceiling on provider spend. A single process-wide counter
+//     cannot be bypassed by rotating spoofed addresses. BYO-key requests
+//     (the user's own keys, see effectiveKeys) are exempt from the global
+//     budget but still per-client limited.
+// Limits are read from env on every call so tests can tune them; counters are
+// in-memory (per instance) which is the intended scope for this demo app.
 const RATE_WINDOW_MS = 60_000;
-const RATE_MAX_REQUESTS = 20; // per IP per minute across both vision POSTs
+
+function intEnv(name: string, fallback: number): number {
+  const v = Number(process.env[name]);
+  return Number.isFinite(v) && v > 0 ? Math.floor(v) : fallback;
+}
+const perIpMax = () => intEnv("VISION_RATE_PER_MIN", 20);
+const globalPerMin = () => intEnv("VISION_GLOBAL_PER_MIN", 60);
+const globalPerDay = () => intEnv("VISION_GLOBAL_PER_DAY", 1500);
+
 const rateHits = new Map<string, { count: number; windowStart: number }>();
+let globalMinute = { count: 0, windowStart: 0 };
+let globalDay = { count: 0, day: "" };
+
+/** Test hook — clears all in-memory limiter state. */
+export function __resetVisionRateState(): void {
+  rateHits.clear();
+  globalMinute = { count: 0, windowStart: 0 };
+  globalDay = { count: 0, day: "" };
+}
 
 setInterval(() => {
   const now = Date.now();
@@ -54,7 +81,7 @@ setInterval(() => {
   }
 }, 5 * 60_000).unref();
 
-/** Returns true (and answers 429) when the client is over the limit. */
+/** Returns true (and answers 429) when the client is over the per-IP limit. */
 function rateLimit(req: Request, res: Response): boolean {
   const ip = req.ip || "unknown";
   const now = Date.now();
@@ -64,15 +91,59 @@ function rateLimit(req: Request, res: Response): boolean {
     return false;
   }
   h.count++;
-  if (h.count > RATE_MAX_REQUESTS) {
+  if (h.count > perIpMax()) {
     res.status(429).json({ error: "rate_limited" });
     return true;
   }
   return false;
 }
 
+/**
+ * Global spend ceiling for the server-held keys. Consumes one slot unless a
+ * window is exhausted. Spoof-proof: not keyed by anything client-supplied.
+ */
+function serverKeyBudgetExceeded(): boolean {
+  const now = Date.now();
+  if (now - globalMinute.windowStart >= RATE_WINDOW_MS) {
+    globalMinute = { count: 0, windowStart: now };
+  }
+  const today = new Date(now).toISOString().slice(0, 10);
+  if (globalDay.day !== today) {
+    globalDay = { count: 0, day: today };
+  }
+  if (globalMinute.count >= globalPerMin() || globalDay.count >= globalPerDay()) {
+    return true;
+  }
+  globalMinute.count++;
+  globalDay.count++;
+  return false;
+}
+
 const geminiKey = () => process.env.GEMINI_API_KEY ?? "";
 const claudeKey = () => process.env.ANTHROPIC_API_KEY ?? "";
+
+/** Printable ASCII, no whitespace — shape of real provider keys. */
+const KEY_RE = /^[\x21-\x7E]{8,300}$/;
+
+/**
+ * Effective provider keys for one request. Distributed copies of the app can
+ * carry the user's own keys ("bring your own key"); when either user key is
+ * present, ONLY user keys are used — no server-key fallback — so shared
+ * copies never spend the owner's keys. Returns null when a provided key is
+ * malformed.
+ */
+function effectiveKeys(
+  bodyGemini: string | undefined,
+  bodyAnthropic: string | undefined,
+): { gemini: string; anthropic: string; byo: boolean } | null {
+  const g = (bodyGemini ?? "").trim();
+  const a = (bodyAnthropic ?? "").trim();
+  if ((g.length > 0 && !KEY_RE.test(g)) || (a.length > 0 && !KEY_RE.test(a))) {
+    return null;
+  }
+  if (g.length > 0 || a.length > 0) return { gemini: g, anthropic: a, byo: true };
+  return { gemini: geminiKey(), anthropic: claudeKey(), byo: false };
+}
 
 interface RefPhoto {
   id: string;
@@ -105,18 +176,22 @@ function parseIdArray(text: string, ids: Set<string>): string[] {
   return decoded.map((e) => String(e)).filter((e) => ids.has(e));
 }
 
-async function geminiGenerate(parts: unknown[]): Promise<string> {
-  const data = await postJson(`${GEMINI_URL}?key=${encodeURIComponent(geminiKey())}`, {}, {
+async function geminiGenerate(apiKey: string, parts: unknown[]): Promise<string> {
+  const data = await postJson(`${GEMINI_URL}?key=${encodeURIComponent(apiKey)}`, {}, {
     contents: [{ parts }],
     generationConfig: { response_mime_type: "application/json" },
   });
   return data.candidates[0].content.parts[0].text as string;
 }
 
-async function claudeMessages(content: unknown, maxTokens: number): Promise<string> {
+async function claudeMessages(
+  apiKey: string,
+  content: unknown,
+  maxTokens: number,
+): Promise<string> {
   const data = await postJson(
     CLAUDE_URL,
-    { "x-api-key": claudeKey(), "anthropic-version": "2023-06-01" },
+    { "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
     {
       model: "claude-sonnet-5",
       max_tokens: maxTokens,
@@ -196,8 +271,17 @@ router.post("/vision/inspect", async (req, res) => {
     res.status(400).json({ error: "invalid_request" });
     return;
   }
-  if (geminiKey().length === 0 && claudeKey().length === 0) {
+  const keys = effectiveKeys(parsed.data.geminiKey, parsed.data.anthropicKey);
+  if (!keys) {
+    res.status(400).json({ error: "invalid_request" });
+    return;
+  }
+  if (keys.gemini.length === 0 && keys.anthropic.length === 0) {
     res.status(503).json({ error: "no_api_keys" });
+    return;
+  }
+  if (!keys.byo && serverKeyBudgetExceeded()) {
+    res.status(429).json({ error: "rate_limited" });
     return;
   }
 
@@ -237,18 +321,22 @@ router.post("/vision/inspect", async (req, res) => {
     "return []. No explanation, no markdown, JSON array only.";
   const ids = new Set(items.map((e) => e.id));
 
-  if (geminiKey().length > 0) {
+  if (keys.gemini.length > 0) {
     try {
-      const text = await geminiGenerate(geminiParts(prompt, refs, photos));
+      const text = await geminiGenerate(keys.gemini, geminiParts(prompt, refs, photos));
       res.json(VisionInspectResponse.parse({ missing: parseIdArray(text, ids) }));
       return;
     } catch (err) {
       req.log.warn({ err }, "gemini inspect failed");
     }
   }
-  if (claudeKey().length > 0) {
+  if (keys.anthropic.length > 0) {
     try {
-      const text = await claudeMessages(claudeContent(prompt, refs, photos), 300);
+      const text = await claudeMessages(
+        keys.anthropic,
+        claudeContent(prompt, refs, photos),
+        300,
+      );
       res.json(VisionInspectResponse.parse({ missing: parseIdArray(text, ids) }));
       return;
     } catch (err) {
@@ -280,8 +368,17 @@ router.post("/vision/suggest", async (req, res) => {
     res.status(400).json({ error: "invalid_request" });
     return;
   }
-  if (geminiKey().length === 0 && claudeKey().length === 0) {
+  const keys = effectiveKeys(parsed.data.geminiKey, parsed.data.anthropicKey);
+  if (!keys) {
+    res.status(400).json({ error: "invalid_request" });
+    return;
+  }
+  if (keys.gemini.length === 0 && keys.anthropic.length === 0) {
     res.status(503).json({ error: "no_api_keys" });
+    return;
+  }
+  if (!keys.byo && serverKeyBudgetExceeded()) {
+    res.status(429).json({ error: "rate_limited" });
     return;
   }
 
@@ -319,18 +416,18 @@ router.post("/vision/suggest", async (req, res) => {
     return { ids: picked, extra };
   };
 
-  if (geminiKey().length > 0) {
+  if (keys.gemini.length > 0) {
     try {
-      const text = await geminiGenerate([{ text: prompt }]);
+      const text = await geminiGenerate(keys.gemini, [{ text: prompt }]);
       res.json(VisionSuggestResponse.parse(parseSuggest(text)));
       return;
     } catch (err) {
       req.log.warn({ err }, "gemini suggest failed");
     }
   }
-  if (claudeKey().length > 0) {
+  if (keys.anthropic.length > 0) {
     try {
-      const text = await claudeMessages(prompt, 500);
+      const text = await claudeMessages(keys.anthropic, prompt, 500);
       res.json(VisionSuggestResponse.parse(parseSuggest(text)));
       return;
     } catch (err) {

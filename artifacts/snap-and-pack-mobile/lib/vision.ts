@@ -12,6 +12,20 @@ import { visionInspect, visionSuggest } from '@workspace/api-client-react';
 
 import type { Item } from './items';
 import { dataUriToBase64 } from './photos';
+import { Store } from './store';
+
+/**
+ * 端末に保存された自分のキー(配布版で各自入力)。設定されているときは
+ * サーバー側のキーの代わりに、このキーだけが使われる。
+ */
+function ownKeys(): { geminiKey?: string; anthropicKey?: string } {
+  const geminiKey = Store.userGeminiKey();
+  const anthropicKey = Store.userAnthropicKey();
+  return {
+    ...(geminiKey ? { geminiKey } : {}),
+    ...(anthropicKey ? { anthropicKey } : {}),
+  };
+}
 
 /**
  * 写真(1〜複数枚)のどれにも写っていない持ち物の id リストを返す。
@@ -31,6 +45,7 @@ export async function findMissing(
       items: items.map((e) => ({ id: e.id, name: e.en })),
       refs,
       lenient,
+      ...ownKeys(),
     });
     return res.missing;
   } catch {
@@ -59,6 +74,7 @@ export async function suggestItems(params: {
       ...(params.time ? { time: params.time } : {}),
       ...(params.location ? { location: params.location } : {}),
       candidates: params.candidates.map((e) => ({ id: e.id, name: e.ja })),
+      ...ownKeys(),
     });
     return { ids: res.ids, extra: res.extra };
   } catch {

@@ -64,6 +64,7 @@ flutter test
 - **AI キーはクライアントに置かない**: Expo 版の AI 呼び出しは api-server の `/api/vision/{status,inspect,suggest}` プロキシ経由。キー未設定時は 503 → アプリ側がオフライン簡易判定にフォールバックし「APIキー未設定」バナーを表示。
 - **永続化は AsyncStorage** で Flutter の SharedPreferences とキー互換 (`mods_<presetId>`, `my_items`, `sg_<eventKey>`, `lenient_ids`)。参照写真はファイルパスではなく data URI で保存(クロスプラットフォーム対応)。
 - **アプリアイコンは `flutter-app/tool/app_icon.png` をコピー**して使用(再生成しない)。
+- **配布用BYOキー**: アプリの設定画面(⚙️)で各自の Gemini / Anthropic キーを入力可能(端末の AsyncStorage にのみ保存、AI リクエストに同乗)。ユーザーキーが1つでもあるときはサーバーキーにフォールバックしない — 配布先が所有者のキーを消費しない設計。
 - ML Kit の端末内カウントは Expo 版では対象外(検問中スピナーで代替)。
 
 ## Product

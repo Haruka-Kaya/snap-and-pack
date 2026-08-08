@@ -168,6 +168,16 @@ components:
           items:
             type: string
           description: Item ids previously confirmed as false-missing (judge leniently)
+        geminiKey:
+          type: string
+          maxLength: 300
+          description: >-
+            Optional user-supplied Gemini API key. When either user key is
+            present, only user keys are used (no server-key fallback).
+        anthropicKey:
+          type: string
+          maxLength: 300
+          description: Optional user-supplied Anthropic API key
       required:
         - photos
         - items
@@ -205,6 +215,16 @@ components:
           items:
             $ref: "#/components/schemas/ChecklistItem"
           minItems: 1
+        geminiKey:
+          type: string
+          maxLength: 300
+          description: >-
+            Optional user-supplied Gemini API key. When either user key is
+            present, only user keys are used (no server-key fallback).
+        anthropicKey:
+          type: string
+          maxLength: 300
+          description: Optional user-supplied Anthropic API key
       required:
         - title
         - candidates

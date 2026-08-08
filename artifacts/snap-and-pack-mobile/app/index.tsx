@@ -155,6 +155,14 @@ export default function HomeScreen() {
               <MaterialIcons name="luggage" size={24} color={colors.foreground} />
             </Pressable>
             <Pressable
+              testID="open-settings"
+              onPress={() => router.push('/settings')}
+              style={styles.iconBtn}
+              hitSlop={6}
+            >
+              <Feather name="settings" size={22} color={colors.foreground} />
+            </Pressable>
+            <Pressable
               testID="lang-toggle"
               onPress={() => setLang(lang === 'ja' ? 'en' : 'ja')}
               style={[

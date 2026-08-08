@@ -55,6 +55,25 @@ const m: Record<string, [string, string]> = {
     'AI判定にはAPIキーが必要です。今はオフライン簡易判定になります',
     'AI inspection needs an API key. Falling back to offline quick check for now',
   ],
+  tapToSetKeys: ['タップして自分のキーを入力できます', 'Tap to enter your own keys'],
+  settings: ['設定', 'Settings'],
+  apiKeysTitle: ['AIのAPIキー', 'AI API keys'],
+  apiKeysHint: [
+    '配布版を使うときは、自分のAPIキーをここに入力してください。キーはこの端末の中だけに保存され、AI判定のときだけ送られます。入力すると、サーバー側のキーの代わりに入力したキーだけが使われます。どちらか片方だけでも動きます。',
+    'Using a shared copy? Enter your own API keys here. They are stored only on this device and sent only for AI inspection. When set, only your keys are used instead of the server keys. Either one alone works.',
+  ],
+  geminiKeyLabel: ['Gemini APIキー', 'Gemini API key'],
+  anthropicKeyLabel: ['Anthropic APIキー', 'Anthropic API key'],
+  apiKeysStorageNoteNative: [
+    'キーはこの端末の安全な保管領域(キーチェーン)に保存されます。',
+    'Keys are stored in this device\u2019s secure storage (keychain).',
+  ],
+  apiKeysStorageNoteWeb: [
+    'Web版ではブラウザ内の簡易保存になります。共用のパソコンでは保存しないでください。',
+    'On the web version, keys are kept in plain browser storage. Avoid saving them on a shared computer.',
+  ],
+  save: ['保存', 'Save'],
+  savedKeys: ['保存しました', 'Saved'],
 };
 
 export function t(lang: AppLang, key: string): string {

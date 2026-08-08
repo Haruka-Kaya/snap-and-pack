@@ -12,7 +12,9 @@
  */
 
 import { useSyncExternalStore } from 'react';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 import { baseItemPool, type Item, type Preset } from './items';
 
@@ -41,6 +43,31 @@ function persist(key: string, value: string): void {
   cache.set(key, value);
   emit();
   AsyncStorage.setItem(key, value).catch(() => {});
+}
+
+/** ユーザー入力の API キーのフィールド(通常データとは別扱い)。 */
+const USER_KEY_FIELDS = ['user_gemini_key', 'user_anthropic_key'] as const;
+type UserKeyField = (typeof USER_KEY_FIELDS)[number];
+
+/**
+ * API キーはネイティブでは OS の安全な保管領域(SecureStore/キーチェーン)、
+ * Web ではブラウザ保存(AsyncStorage)。空文字で削除。
+ */
+function persistUserKey(field: UserKeyField, value: string): void {
+  const v = value.trim();
+  if (v.length === 0) {
+    cache.delete(field);
+  } else {
+    cache.set(field, v);
+  }
+  emit();
+  if (Platform.OS === 'web') {
+    if (v.length === 0) AsyncStorage.removeItem(field).catch(() => {});
+    else AsyncStorage.setItem(field, v).catch(() => {});
+  } else {
+    if (v.length === 0) SecureStore.deleteItemAsync(field).catch(() => {});
+    else SecureStore.setItemAsync(field, v).catch(() => {});
+  }
 }
 
 function readJson<T>(key: string, fallback: T): T {
@@ -97,6 +124,27 @@ export const Store = {
       }
     } catch {
       // Start with an empty store when storage is unavailable.
+    }
+    if (Platform.OS !== 'web') {
+      // API キーは SecureStore から読む。旧版が AsyncStorage に保存して
+      // いた場合は安全領域へ移行してから消す。
+      for (const field of USER_KEY_FIELDS) {
+        try {
+          const legacy = cache.get(field);
+          let v = await SecureStore.getItemAsync(field);
+          if ((v == null || v.length === 0) && legacy) {
+            await SecureStore.setItemAsync(field, legacy);
+            v = legacy;
+          }
+          if (legacy != null) {
+            AsyncStorage.removeItem(field).catch(() => {});
+          }
+          cache.delete(field);
+          if (v) cache.set(field, v);
+        } catch {
+          // Keychain unavailable — keys stay session-only.
+        }
+      }
     }
     ready = true;
     emit();
@@ -231,6 +279,21 @@ export const Store = {
 
   lenientIds(): string[] {
     return readJson<string[]>('lenient_ids', []);
+  },
+
+  // ---- 自分の API キー(配布版で各自入力。この端末にのみ保存) ----
+
+  userGeminiKey(): string {
+    return cache.get('user_gemini_key') ?? '';
+  },
+
+  userAnthropicKey(): string {
+    return cache.get('user_anthropic_key') ?? '';
+  },
+
+  setUserKeys(geminiKey: string, anthropicKey: string): void {
+    persistUserKey('user_gemini_key', geminiKey);
+    persistUserKey('user_anthropic_key', anthropicKey);
   },
 };
 

@@ -32,6 +32,10 @@ export const VisionStatusResponse = zod.object({
  */
 
 
+export const visionInspectBodyGeminiKeyMax = 300;
+
+export const visionInspectBodyAnthropicKeyMax = 300;
+
 
 
 export const VisionInspectBody = zod.object({
@@ -44,7 +48,9 @@ export const VisionInspectBody = zod.object({
   "id": zod.string().describe('Item id this reference photo belongs to'),
   "data": zod.string().describe('Base64-encoded JPEG (no data URI prefix)')
 })).optional(),
-  "lenient": zod.array(zod.string()).optional().describe('Item ids previously confirmed as false-missing (judge leniently)')
+  "lenient": zod.array(zod.string()).optional().describe('Item ids previously confirmed as false-missing (judge leniently)'),
+  "geminiKey": zod.string().max(visionInspectBodyGeminiKeyMax).optional().describe('Optional user-supplied Gemini API key. When either user key is present, only user keys are used (no server-key fallback).'),
+  "anthropicKey": zod.string().max(visionInspectBodyAnthropicKeyMax).optional().describe('Optional user-supplied Anthropic API key')
 })
 
 export const VisionInspectResponse = zod.object({
@@ -57,6 +63,10 @@ export const VisionInspectResponse = zod.object({
  * @summary Suggest packing items for a calendar event
  */
 
+export const visionSuggestBodyGeminiKeyMax = 300;
+
+export const visionSuggestBodyAnthropicKeyMax = 300;
+
 
 
 export const VisionSuggestBody = zod.object({
@@ -66,7 +76,9 @@ export const VisionSuggestBody = zod.object({
   "candidates": zod.array(zod.object({
   "id": zod.string(),
   "name": zod.string()
-})).min(1)
+})).min(1),
+  "geminiKey": zod.string().max(visionSuggestBodyGeminiKeyMax).optional().describe('Optional user-supplied Gemini API key. When either user key is present, only user keys are used (no server-key fallback).'),
+  "anthropicKey": zod.string().max(visionSuggestBodyAnthropicKeyMax).optional().describe('Optional user-supplied Anthropic API key')
 })
 
 export const VisionSuggestResponse = zod.object({

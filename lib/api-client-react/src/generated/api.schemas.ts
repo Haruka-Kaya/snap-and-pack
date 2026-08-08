@@ -37,6 +37,16 @@ export interface VisionInspectRequest {
   refs?: ReferencePhoto[];
   /** Item ids previously confirmed as false-missing (judge leniently) */
   lenient?: string[];
+  /**
+     * Optional user-supplied Gemini API key. When either user key is present, only user keys are used (no server-key fallback).
+     * @maxLength 300
+     */
+  geminiKey?: string;
+  /**
+     * Optional user-supplied Anthropic API key
+     * @maxLength 300
+     */
+  anthropicKey?: string;
 }
 
 export interface VisionInspectResult {
@@ -55,6 +65,16 @@ export interface VisionSuggestRequest {
   location?: string;
   /** @minItems 1 */
   candidates: ChecklistItem[];
+  /**
+     * Optional user-supplied Gemini API key. When either user key is present, only user keys are used (no server-key fallback).
+     * @maxLength 300
+     */
+  geminiKey?: string;
+  /**
+     * Optional user-supplied Anthropic API key
+     * @maxLength 300
+     */
+  anthropicKey?: string;
 }
 
 export interface VisionSuggestResult {

@@ -58,7 +58,10 @@ export default function CheckScreen() {
       staleTime: 5 * 60 * 1000,
     },
   });
-  const showNoKeyBanner = visionStatus.data?.hasKeys === false && !demoMode;
+  const hasOwnKeys =
+    Store.userGeminiKey().length > 0 || Store.userAnthropicKey().length > 0;
+  const showNoKeyBanner =
+    visionStatus.data?.hasKeys === false && !hasOwnKeys && !demoMode;
 
   const items = preset ? Store.effectiveItems(preset) : [];
 
@@ -153,8 +156,9 @@ export default function CheckScreen() {
         showsVerticalScrollIndicator={false}
       >
         {showNoKeyBanner && (
-          <View
+          <Pressable
             testID="no-key-banner"
+            onPress={() => router.push('/settings')}
             style={[
               styles.banner,
               {
@@ -170,7 +174,10 @@ export default function CheckScreen() {
             <Text style={{ fontSize: 12, color: colors.mutedForeground, marginTop: 2 }}>
               {t(lang, 'apiKeyMissingHint')}
             </Text>
-          </View>
+            <Text style={{ fontSize: 12, fontWeight: '600', color: colors.foreground, marginTop: 6 }}>
+              {t(lang, 'tapToSetKeys')}
+            </Text>
+          </Pressable>
         )}
 
         <Text style={[styles.sectionLabel, { color: colors.foreground }]}>

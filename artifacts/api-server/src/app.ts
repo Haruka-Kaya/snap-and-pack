@@ -6,8 +6,12 @@ import { logger } from "./lib/logger";
 
 const app: Express = express();
 
-// Behind the Replit proxy — needed for real client IPs (vision rate limiting).
-app.set("trust proxy", true);
+// Trust exactly ONE proxy hop (the Replit proxy in front of this server).
+// req.ip then resolves to the rightmost X-Forwarded-For entry — the address
+// the trusted proxy saw — so entries prepended by a spoofing client are
+// ignored. Client-identity limits stay best-effort regardless; the hard,
+// spoof-proof spend ceiling is the global server-key budget in routes/vision.
+app.set("trust proxy", 1);
 
 app.use(
   pinoHttp({
